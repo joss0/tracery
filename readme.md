@@ -2,8 +2,14 @@
 
 ## About
 Tracery was developed by Kate Compton, beginning March 2013 as a class assignment.
-This is version 0.7
-(This is the first numbered version of Tracery, chosen arbitrarily. All basic syntax is stable, but some advanced features like nested rules, if-statements, and modifiers with parameters are still in flux)
+
+This is a fork of [galaxykate/tracery](https://github.com/galaxykate/tracery), based on its `tracery2` branch, with bugs fixed and a regression suite added. [CHANGES.md](CHANGES.md) lists every difference.
+
+Run the tests with `npm test`. There is nothing to build, and no dependencies. In Node:
+
+    var tracery = require("./js/tracery/tracery.js");
+    var grammar = tracery.createGrammar({origin:"#animal.a#", animal:"owl"});
+    grammar.addModifiers(tracery.baseEngModifiers);
 
 
 ## Basic usage
@@ -31,9 +37,10 @@ Get the fully-expanded node from a rule, this will return a root node containing
 
     grammar.expand("#origin#");
     
-Get the root node from a rule *not* fully expanded (this allows for animating the expansion of the tree) TODO, this is still buggy and does not correctly set the "finishedText"
+Get the root node from a rule *not* fully expanded (this allows for animating the expansion of the tree). Its "finishedText" stays empty until the children are expanded.
 
-    grammar.expand("#origin#", true);
+    var root = grammar.createRoot("#origin#");
+    root.expand(true);
     
     // animate the expansion over time
     var stepTimer = setInterval(function() {
@@ -45,6 +52,16 @@ Get the root node from a rule *not* fully expanded (this allows for animating th
                    refreshGrammarOutput();
                 }, 40);
     
+
+### Errors and limits
+
+Expansion doesn't throw on a bad grammar. Problems appear in the text as markers like `((missing))`, and `grammar.errors` lists everything that went wrong in the most recent expansion.
+
+One expansion stops at 1000 nested nodes, 1,000,000 nodes in all, or 10,000,000 characters. A grammar that hits a limit gets a marker, an error, and a `clearState()`. To change the limits:
+
+    grammar = tracery.createGrammar(raw, {maxDepth: 200, maxNodes: 50000, maxLength: 100000});
+
+Rules pushed by bare actions like `[hero:#name#]` stay in place between expansions. Call `grammar.clearState()` to start a new generation from the original grammar.
 
 ### Making Tracery deterministic
 
@@ -89,8 +106,11 @@ To apply a modifier, add its name after a period, after the tag's main symbol:
 	#booktitle.capitalizeAll#
 	Hundreds of #animal.s#
 
-Modifiers can have parameters, too! (soon they will can have parameter that contain tags, which will be expanded when applying the modifier, but not yet)
+Modifiers can have parameters, too, and the parameters can contain tags. Spaces in parameters count. Write `\,` `\(` `\)` or `\.` for those characters literally (`\\,` and so on inside a JSON string).
 	#story.replace(he,she).replace(him,her).replace(his,hers)#
+	#story.replace(#oldName#,#newName#)#
+
+A modifier is called with the current node as `this`, while the actions in its tag are still active.
 
 ### Action
 An action that occurs when its node is expanded.  Built-in actions are 

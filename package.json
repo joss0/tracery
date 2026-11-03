@@ -1,0 +1,14 @@
+{
+  "name": "tracery-fork",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Fork of Kate Compton's Tracery text-expansion library (tracery2 branch)",
+  "main": "js/tracery/tracery.js",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
