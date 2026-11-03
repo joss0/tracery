@@ -1,5 +1,7 @@
 /**
  * @author Kate
+ *
+ * Modified from upstream galaxykate/tracery (tracery2 branch). See CHANGES.md.
  */
 
 function isVowel(c) {
@@ -10,113 +12,103 @@ function isVowel(c) {
 function isAlphaNum(c) {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 };
-function escapeRegExp(str) {
-	return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+
+// Vowel letters with a consonant sound ("a unicorn"), and the reverse ("an hour")
+var consonantSoundVowels = /^(uni(corn|form|on|que|t|vers|cycl|lateral|son|fy|fi|sex)|us[eau]|ut[eio]|ubi|uku|ur[aeio]|eu|ewe|one($|[^a-z])|once)/;
+var vowelSoundConsonants = /^(hour|honest|honou?r|heir)/;
+
+// "stop" -> "stopp": one short vowel between single consonants, at the end of a one-syllable word
+function doubleFinalConsonant(s) {
+	var word = s.match(/[a-zA-Z]+$/);
+	if (word && /^[^aeiou]+[aeiou][^aeiouwxy]$/i.test(word[0]))
+		return s + s.charAt(s.length - 1);
+	return s;
 }
 
 var baseEngModifiers = {
 
 	replace : function(s, params) {
-		//http://stackoverflow.com/questions/1144783/replacing-all-occurrences-of-a-string-in-javascript
-		return s.replace(new RegExp(escapeRegExp(params[0]), 'g'), params[1]);
+		// An empty search would match between every character
+		if (!params || !params[0] || params[1] === undefined)
+			return s;
+
+		return s.split(params[0]).join(params[1]);
 	},
 
 	capitalizeAll : function(s) {
-		var s2 = "";
-		var capNext = true;
-		for (var i = 0; i < s.length; i++) {
-
-			if (!isAlphaNum(s.charAt(i))) {
-				capNext = true;
-				s2 += s.charAt(i);
-			} else {
-				if (!capNext) {
-					s2 += s.charAt(i);
-				} else {
-					s2 += s.charAt(i).toUpperCase();
-					capNext = false;
-				}
-
-			}
-		}
-		return s2;
+		return s.replace(/[\p{L}\p{N}\p{M}]+(?:['’][\p{L}\p{N}\p{M}]+)*/gu, function(word) {
+			var first = Array.from(word)[0];
+			return first.toUpperCase() + word.substring(first.length);
+		});
 	},
 
+	// Capitalizes the first letter, passing over any leading punctuation.
+	//  Text that begins with a digit is left alone.
 	capitalize : function(s) {
-		return s.charAt(0).toUpperCase() + s.substring(1);
+		// A "((missing symbol))" marker should keep showing the real name
+		if (s.indexOf("((") === 0)
+			return s;
+
+		return s.replace(/^([^\p{L}\p{N}]*)(\p{L})/u, function(match, prefix, letter) {
+			return prefix + letter.toUpperCase();
+		});
 	},
 
 	a : function(s) {
-		if (s.length > 0) {
-			if (s.charAt(0).toLowerCase() === 'u') {
-				if (s.length > 2) {
-					if (s.charAt(2).toLowerCase() === 'i')
-						return "a " + s;
-				}
-			}
+		var lower = s.toLowerCase();
 
-			if (isVowel(s.charAt(0))) {
-				return "an " + s;
-			}
-		}
+		if (consonantSoundVowels.test(lower))
+			return "a " + s;
+
+		if (vowelSoundConsonants.test(lower))
+			return "an " + s;
+
+		if (s.length > 0 && isVowel(s.charAt(0)))
+			return "an " + s;
 
 		return "a " + s;
-
 	},
 
 	firstS : function(s) {
-		console.log(s);
-		var s2 = s.split(" ");
-
-		var finished = baseEngModifiers.s(s2[0]) + " " + s2.slice(1).join(" ");
-		console.log(finished);
-		return finished;
+		var words = s.split(" ");
+		words[0] = baseEngModifiers.s(words[0]);
+		return words.join(" ");
 	},
 
 	s : function(s) {
-		switch (s.charAt(s.length -1)) {
-		case 's':
+		if (s.length === 0)
+			return s;
+
+		if (/(s|x|z|ch|sh)$/i.test(s))
 			return s + "es";
-			break;
-		case 'h':
-			return s + "es";
-			break;
-		case 'x':
-			return s + "es";
-			break;
-		case 'y':
-			if (!isVowel(s.charAt(s.length - 2)))
-				return s.substring(0, s.length - 1) + "ies";
-			else
-				return s + "s";
-			break;
-		default:
-			return s + "s";
-		}
+
+		if (/y$/i.test(s) && !isVowel(s.charAt(s.length - 2)))
+			return s.substring(0, s.length - 1) + "ies";
+
+		return s + "s";
 	},
+
 	ed : function(s) {
-		switch (s.charAt(s.length -1)) {
-		case 's':
-			return s + "ed";
-			break;
-		case 'e':
+		if (/e$/i.test(s))
 			return s + "d";
-			break;
-		case 'h':
-			return s + "ed";
-			break;
-		case 'x':
-			return s + "ed";
-			break;
-		case 'y':
-			if (!isVowel(s.charAt(s.length - 2)))
-				return s.substring(0, s.length - 1) + "ied";
-			else
-				return s + "d";
-			break;
-		default:
-			return s + "ed";
-		}
+
+		if (/y$/i.test(s) && !isVowel(s.charAt(s.length - 2)))
+			return s.substring(0, s.length - 1) + "ied";
+
+		return doubleFinalConsonant(s) + "ed";
+	},
+
+	ing : function(s) {
+		if (/ie$/i.test(s))
+			return s.substring(0, s.length - 2) + "ying";
+
+		if (/e$/i.test(s) && !/[eoy]e$/i.test(s) && s.length > 2)
+			return s.substring(0, s.length - 1) + "ing";
+
+		return doubleFinalConsonant(s) + "ing";
 	}
 };
 
+if ( typeof module !== "undefined" && module.exports) {
+	module.exports = baseEngModifiers;
+}
